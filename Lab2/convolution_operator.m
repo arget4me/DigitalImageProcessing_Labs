@@ -2,6 +2,7 @@ function [img_out] = convolution_operator(img_in, kernel)
 % img_out = convolution_operator(img_in, kernel) convolves the input image img_in
 % with the filter kernel and returns the result in img_out
 % img_in, img_out, and kernel are of double precision
+%	@LOGIC:
 if ~isa(img_in,'double')
    img_in = double(img_in);
 end
@@ -10,7 +11,7 @@ if ~isa(kernel,'double')
     kernel = double(kernel);
 end
 
-%initialize variables
+%initialize variables sizes
 kernelSize = floor(size(kernel)./2); b = kernelSize(1); a = kernelSize(2);
 imgSize = size(img_in); num_rows = imgSize(1); num_columns = imgSize(2);
 img_out = zeros(imgSize);
