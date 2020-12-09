@@ -234,7 +234,8 @@ sigma_range = 6; %[2,  6, 18];
 %   What will tend to happen with a much larger range_sigma then the kernel_size is 
 %that only a small part around the mean is used and results in a filter similar to the 
 %mean filter instead of a gaussian (For range only. sigma_domain, the standard deviation for the gaussian 
-%refering to intensity, is limited by the range of intensities [0, 1])
+%refering to intensity, is limited but not constrained by the range of intensities [0, 1],
+%lorge sigma_domain values leads to a behavior similar to the gaussian blur)
 
 sigma_domain = 0.1; %[0.1, 0.25, 10];
 kernel_size = 9;

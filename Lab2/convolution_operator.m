@@ -21,10 +21,11 @@ end
 if ~isa(kernel,'double') %Make sure kernel weights are doubles
     kernel = double(kernel);
 end
+convolution_kernel = rot90(rot90(kernel)); %Convolution rotates the kernel 180 degrees, correlation keeps it the same.
 
 %initialize variables sizes
-a = floor(size(kernel, 1)./2); %Num positions above/below the center of the kernel
-b = floor(size(kernel, 2)./2); %Num positions right/left of the center of the kernel
+a = floor(size(convolution_kernel, 1)./2); %Num positions above/below the center of the kernel
+b = floor(size(convolution_kernel, 2)./2); %Num positions right/left of the center of the kernel
 kernel_center = [a; b] + [1; 1]; %By the previous logic the center is one index larger to the right and down from [a, b]. (Index of the top left kernel position is [1; 1])
 
 img_size = size(img_in);
@@ -76,7 +77,7 @@ for column = 1:num_columns
                 end
                 
                 %Sum up img_in pixels multiplied by kernel weights
-                img_out(row, column, :) = img_out(row, column, :) + kernel(s_index, t_index) .* img_in(row_neighbor, column_neighbor, :);
+                img_out(row, column, :) = img_out(row, column, :) + convolution_kernel(s_index, t_index) .* img_in(row_neighbor, column_neighbor, :);
             end
         end
         
