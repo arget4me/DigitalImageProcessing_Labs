@@ -2,6 +2,7 @@
 %% 1 Setup
 clear all; close all; clc;
 
+%Add a path to folder with all images. Test that all images can be loaded correctly.
 addpath('extra_test_images')
 tif_files = dir("extra_test_images/*.tif");
 png_files = dir("extra_test_images/*.png");
@@ -9,7 +10,6 @@ image_files = [tif_files;png_files]
 
 num_rows = floor(sqrt(length(image_files)));
 num_columns = ceil(sqrt(length(image_files)));
-figure
 for i = 1:length(image_files)
     subplot(num_rows, num_columns, i);
     I = imread(image_files(i).name);
@@ -19,68 +19,141 @@ end
 %% 1  Linear Spatial Filtering
 %%    1.1 Convolution Operator
 clear all; close all; clc;
-gauss_mask = fspecial('gaussian', 3, 0.849);
 
+%Find all .tif and .png images in image folder.
 tif_files = dir("extra_test_images/*.tif");
 png_files = dir("extra_test_images/*.png");
 image_files = [tif_files;png_files];
 
-kernel = gauss_mask
+%Subplot dimensions: 
+%   One row per image (assuming a maximum of 5 images in the folder).
+%   Three columns to display:
+%       1)convolution_operator result 
+%       2)imfilter result 
+%       3)image subtraction between the previous two
+num_rows = length(image_files); num_columns = 3;
 
-num_rows = length(image_files);
-num_columns = 3;
-figure
+%The kernel demonstrated will be a gaussian kernel
+%Using fspecial('gaussian', hsize, sigma) with hsize = 3 and sigma = 0.3849 gives a similar kernel to the next line
+%   gauss_mask = fspecial('gaussian', 3, 0.849);
+gauss_mask = [0.0625 0.125 0.0625; 0.125 0.25 0.125; 0.0625 0.125, 0.0625];
+
+errors = zeros(1, length(image_files)); %Initialize variable to store the max errors of image subtraction for every image.
+
 for i = 1:length(image_files)
-    I = im2double(imread(image_files(i).name));
+    I = im2double(imread(image_files(i).name)); %Read image i (from list of images in folder)
     
-    subplot(num_rows, num_columns, num_columns * i - 2);
-    img_out = convolution_operator(I, kernel); %mirror at border
-    imshow(img_out, []); title('Gaussian', 'Interpreter', 'none');
+%1) Display convolution_operator result, Border strategy is to use mirror the pixels around the border 
+    img_out = convolution_operator(I, gauss_mask); 
+    subplot(num_rows, num_columns, num_columns * (i - 1) + 1);
+    imshow(img_out, []); title('Convolution Operator');
     
-    subplot(num_rows, num_columns, num_columns * i - 1);
-    img_filter = imfilter(I, kernel, 'conv', 'symmetric'); %mirror at border
-    imshow(img_filter, []); title('Imfilter', 'Interpreter', 'none');
     
-    subplot(num_rows, num_columns, num_columns * i - 0);
-    imshow(img_filter - img_out, []); title('Subtract: Gaussian & Imfilter', 'Interpreter', 'none');
+ %2) Display imfilter result
+    img_filter = imfilter(I, gauss_mask, 'conv', 'symmetric'); %mirror at border
+    subplot(num_rows, num_columns, num_columns * (i - 1) + 2);
+    imshow(img_filter, []); title('Imfilter');
+    
+    
+%3) Display image subtraction between convolution_operator result and imfilter result
+    image_subtraction = img_filter - img_out;
+    
+    %Save max errors between the convolution_operator and imfilter for every image.
+    errors(i) = max(abs(image_subtraction), [], 'all');
+    
+    %Display the difference between two rgb images in grayscal for better visualisation
+    if(length(size(image_subtraction)) == 3)
+        image_subtraction = rgb2gray(image_subtraction); 
+    end
+    
+    %Rescale the image subtraction to be in range [0, 1] for visualisation
+    image_subtraction = image_subtraction - min(image_subtraction,[],'all'); 
+    image_subtraction = image_subtraction ./ max(image_subtraction,[],'all');
+    
+    %display image subtraction
+    subplot(num_rows, num_columns, num_columns * (i - 1) + 3);
+    imshow(image_subtraction, []); title('Subtract: Convolution & Imfilter');
 end
+
+%Display max errors
+format long; format compact;
+fprintf("Max error between convolution_operator and imfilter for each image (column i refers to image i):\n");
+errors
+format;
 
  %%   1.2 Smoothing Filters
 clear all; close all; clc;
 
 I = im2double(imread("clown.tif"));
 
-
-figure
-subplot(2, 4, 1);
+figure('name', 'Original');
 imshow(I);title('Original', 'Interpreter', 'none');
 
-subplot(2, 4, 2);
+figure('name', 'Convolution operator: smoothing filter');
+
+%The mean filters have the same weights in the entire kernel, and the sum of the kernel adds up to 1.
+%The kernel can be constructed as:
+%   kernel = ones(kernel_size) ./ (kernel_size^2). Or using Matlab function fspecial('average', kernel_size)
+subplot(2, 3, 1);
 img_mean_3 = convolution_operator(I, fspecial('average', 3));
 imshow(img_mean_3, []); title('Mean 3x3', 'Interpreter', 'none');
 
-subplot(2, 4, 3);
+subplot(2, 3, 2);
 img_mean_5 = convolution_operator(I, fspecial('average', 5));
 imshow(img_mean_5, []); title('Mean 5x5', 'Interpreter', 'none');
 
-subplot(2, 4, 4);
+subplot(2, 3, 3);
 img_mean_9 = convolution_operator(I, fspecial('average', 9));
 imshow(img_mean_9, []); title('Mean 9x9', 'Interpreter', 'none');
 
-subplot(2, 4, 5);
-imshow(I);title('Original', 'Interpreter', 'none');
 
+%Using the same sigma as in the previous example. A larger kernelsize than 5 needs
+%a larger sigma to give any significant difference since 2*sigma is
+%considered to account for 95% of distribution.
+%A kernel of size 5x5 has at the border 2 steps from the center, if sigma =
+%0.849 then 2 steps > 2*0.849 step. Steps beyond 2 will be very small and give little difference.
 sigma = 0.849;
-subplot(2, 4, 6);
+
+%The gaussian kernel is defined K*exp(- (s^2 + t^2) / (2*sigma^2)) where s
+%and t are the horizontal and vertical offsets from the center of the
+%kernel. fspecial('gaussian', hsize, sigma) is used to get the kernels but
+%it the following code achive the same resulting kernel as fspecial('gaussian', 3, 0.849):
+%{
+    kernel_size = 3;
+    sigma = 0.849;
+    kernel = ones(kernel_size, kernel_size);
+    K = 1;
+    for s = -floor(kernel_size/2):floor(kernel_size/2)
+        for t = -floor(kernel_size/2):floor(kernel_size/2)
+            kernel(round(kernel_size/2) + s, round(kernel_size/2) + t) = K * exp(- (s^2 + t^2) / (2*sigma^2));
+        end
+    end
+    kernel = kernel ./ sum(kernel, 'all')
+
+    difference_fspecial = kernel - fspecial('gaussian', 3, 0.849)
+%}
+
+subplot(2, 3, 4);
 img_gauss_3 = convolution_operator(I, fspecial('gaussian', 3, sigma));
 imshow(img_gauss_3, []); title('Gaussian 3x3', 'Interpreter', 'none');
 
-subplot(2, 4, 7);
+subplot(2, 3, 5);
 img_gauss_5 = convolution_operator(I, fspecial('gaussian', 5, sigma));
 imshow(img_gauss_5, []); title('Gaussian 5x5', 'Interpreter', 'none');
 
-subplot(2, 4, 8);
-imshow(img_gauss_3 - img_gauss_5, []); title('Subtract: 3x3 & 5x5', 'Interpreter', 'none');
+
+%Displaying a scaled up version of the difference between 3x3 and 5x5
+%gaussian kernel with the same sigma.
+image_subtraction = img_gauss_3 - img_gauss_5;
+
+%Display the max difference since a visual comparison between 3x3 and 5x5
+%gaussian kernel isn't noticable without image subtraction.
+max_error_3_vs_5 = max(abs(image_subtraction), [], 'all') 
+
+image_subtraction = image_subtraction - min(image_subtraction, [], 'all');
+image_subtraction = image_subtraction ./ max(image_subtraction, [], 'all');
+subplot(2, 3, 6);
+imshow(image_subtraction, []); title('Subtract: 3x3 & 5x5', 'Interpreter', 'none');
 
 
 
@@ -88,21 +161,66 @@ imshow(img_gauss_3 - img_gauss_5, []); title('Subtract: 3x3 & 5x5', 'Interpreter
 clear all; close all; clc;
 
 I = im2double(imread("clown.tif"));
+subplot(2, 3, 1);imshow(I, []); title('Original');
 
-%%%%%%%% @NOTE change to not use fspecial, insted use from the lectures and
-%%%%%%%% describe the relation between the gradient and laplacian.. (first vs 2nd derivative)
+%The sobel operators give result of the difference between two sides of the
+%center. It can be described as the partial derivative in the vertical or
+%horizontal direction, but with extra emhasis on the center of the sides
+%for better smoothing. In constant areas the partial derivative sum up to zero.
+%The side where the negative terms go decide the direction/side of the edges detected.
 
-figure
-subplot(1, 2, 1);
-kernel = fspecial('sobel')
-img_out = convolution_operator(I, kernel); %mirror at border
-imshow(img_out, []); title('Sobel', 'Interpreter', 'none');
+vertical_sobel = [
+    1, 2, 1;
+    0, 0, 0;
+    -1, -2, -1;
+ ]
 
-subplot(1, 2, 2);
-kernel = fspecial('laplacian')
-img_out = convolution_operator(I, kernel); %mirror at border
-imshow(img_out, []); title('Laplacian', 'Interpreter', 'none');
+horizontal_sobel = [
+    -1, 0, 1;
+    -2, 0, 2;
+    -1, 0, 1;
+ ]
 
+kernel = vertical_sobel
+img_out_vertical = convolution_operator(I, kernel);
+subplot(2, 3, 2); imshow(img_out_vertical, []); title('3x3 - Vertical Sobel |G_x|');
+
+kernel = horizontal_sobel
+img_out_horizontal = convolution_operator(I, kernel);
+subplot(2, 3, 3); imshow(img_out_horizontal, []); title('3x3 - Horizontal Sobel |G_y|');
+
+%The magnitude is approximated as |G| = |Gx| + |Gy|. An approximation of the expression |G| = sqrt(Gx^2 + Gy^2).
+img_out = abs(img_out_vertical) + abs(img_out_horizontal);
+subplot(2, 3, 4);imshow(img_out, []); title('Approximate magnitude |G| = |G_x| + |G_y|');
+
+%The laplacian is similar to the sobel operator but can be though of as the
+%2nd order derivatives
+
+laplacian = [
+    0, -1, 0;
+    -1, 4, -1;
+    0, -1, 0;
+];%Combined horizontal and vertical laplacian
+
+kernel = laplacian
+img_out = convolution_operator(I, kernel);
+subplot(2, 3, 5);imshow(img_out, []); title('3x3 - Laplacian ');
+
+
+%By increasing the center of the laplacian kernel a sharpening filter is achived.
+laplacian_sharpening = laplacian; laplacian_sharpening(2, 2) = laplacian_sharpening(2, 2) + 1;
+%{
+[
+    0, -1, 0;
+    -1, 5, -1;
+    0, -1, 0;
+]
+%}
+
+kernel = laplacian_sharpening
+img_out = convolution_operator(I, kernel);
+img_out = min(img_out, 1); img_out = max(img_out, 0); %set values above 1 to 1 and values below 0 to 0 in the image.
+subplot(2, 3, 6);imshow(img_out, []); title('3x3 - Laplacian Sharpening');
 
 %% 2 Bilateral Filtering
 clear all; close all; clc;
