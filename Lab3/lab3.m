@@ -216,60 +216,82 @@ end
 
 %% 2.2 Segmentation
 
-index = randi(length(collection(:, 1)), 4);
-%{
-figure('name', 'Laplacian');
-for i = 1:4
-    img = imfilter(rgb2gray(collection{index(i), 1}), fspecial("laplacian"));%collection{index(i), 1}, fspecial("laplcian"))
-    title_string = [farms{collection{index(i), 2}.farm_index},' ', cultivations{collection{index(i), 2}.cultivation_index},' ',shoots{collection{index(i), 2}.shoot_index}];
-    subplot(2, 2, i); imshow(img); title(title_string);
+close all; clc;
+fprintf("\nCurrent index:");
+for index = 1:length(collection(:, 1))
+    if mod(index - 1, 10) == 0
+        fprintf("\n");
+    end
+    fprintf("%d\t", index);
+    title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}];
+
+    figure('name', title_string);
+    subplot(1, 2, 1); imshow(collection{index, 1})
+    img = im2double(rgb2gray(collection{index, 1}));
+    img = (img - min(img, [], 'all')) ./ ( max(img, [], 'all') - min(img, [], 'all') );
+    img_grayscale = imbilatfilt(img, 0.3, 8, 'NeighborhoodSize', 9);
+    img = img_grayscale > 0.6;
+    
+    
+    cc = bwconncomp(img);
+    areas = regionprops(cc, 'Area');
+    x = reshape(struct2array(areas), [], numel(fieldnames(areas)));
+
+    img_remove = zeros(size(img));
+    
+    remove_areas_small = find(x < 600);
+    for i = 1:length(remove_areas_small)
+        current_region = cc.PixelIdxList{remove_areas_small(i)}; 
+
+        for k = 1:length(current_region)
+            img_remove(current_region(k)) = 1;
+        end
+    end
+    
+     remove_areas_big = find(x > 8000);
+    for i = 1:length(remove_areas_big)
+        current_region = cc.PixelIdxList{remove_areas_big(i)}; 
+
+        y_min = size(img, 1);
+        y_max = 0;
+        x_min = size(img, 2);
+        x_max = 0;
+        for k = 1:length(current_region)
+            [row, col] = ind2sub(size(img), current_region(k));
+           
+            if row < y_min
+                y_min = row;
+            end
+            
+            if row > y_max
+                y_max = row;
+            end
+            
+            if col < x_min
+                x_min = col;
+            end
+            
+            if col > x_max
+                x_max = col;
+            end
+        end
+        
+        
+        for col = x_min:x_max
+            for row = y_min:y_max
+            	img_remove(row, col) = 1;
+            end
+        end
+        
+    end
+    img = img - img_remove;
+    img = img > 0.5;
+    
+    subplot(1, 2, 2); imshow(img)
+    
+    img_grayscale = img_grayscale + 0.9 * img;
+    subplot(1, 2, 1); imshow(img_grayscale, [])
 end
-
-figure('name', 'Sobel');
-for i = 1:4
-    img = imfilter(rgb2gray(collection{index(i), 1}), fspecial("sobel"));%collection{index(i), 1}, fspecial("laplcian"))
-    title_string = [farms{collection{index(i), 2}.farm_index},' ', cultivations{collection{index(i), 2}.cultivation_index},' ',shoots{collection{index(i), 2}.shoot_index}];
-    subplot(2, 2, i); imshow(img); title(title_string);
-end
-%}
-%
-
-for i = 1:1
-     title_string = [farms{collection{index(i), 2}.farm_index},' ', cultivations{collection{index(i), 2}.cultivation_index},' ',shoots{collection{index(i), 2}.shoot_index}];
-    img = im2double(rgb2gray(collection{index(i), 1}));
-    figure('name', 'Normal');
-    imshow(img); title(title_string);
-    
-    img = imfilter(img, fspecial('gaussian', 13, 7));
-    img_bilateral = imbilatfilt(img, 0.1, 18, 'NeighborhoodSize', 9);
-    
-    figure('name', 'Bilateral filtering'); 
-    imshow(img_bilateral); title(title_string);
-    
-    img_horizontal = abs(imfilter(img_bilateral, fspecial("sobel")));
-    img_vertical = abs(imfilter(img_bilateral, fspecial("sobel")'));
-    
-    threshold = 0.2;
-    
-    threshold_index = find(img_vertical < threshold);
-    img_vertical(threshold_index) = 0;
-      threshold_index = find(img_vertical >= threshold);
-    img_vertical(threshold_index) = 1;
-
-     threshold_index = find(img_horizontal < threshold);
-    img_horizontal(threshold_index) = 0;
-     threshold_index = find(img_horizontal >= threshold);
-    img_horizontal(threshold_index) = 1;
-    
-    
-    
-    
-    img = img_vertical + img_horizontal;
-    
-   figure('name', 'Sobel edges'); 
-   imshow(img); title(title_string);
-end
-
 
 %% 2.3 Object identification and statistisc collection
 
