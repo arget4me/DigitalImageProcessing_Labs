@@ -182,29 +182,63 @@ for i = 1:length(all_images)
     for k = 1:length(all_images{i})
         current_index = start_index_offset + k;
         
-        s = struct("file_name", '', "farm_index", 0, "cultivation_index", 0, "shoot_index", 0);
-        s.file_name = all_images{i}(k).name;
-        s.farm_index = i;
-        s.cultivation_index = length(cultivations_search_words) + 1;
-        s.shoot_index = length(shoots_search_words) + 1;
+        s = struct("file_name", all_images{i}(k).name, "farm_index", i, "cultivation_index", length(cultivations), "shoot_index", length(shoots), "pair_tag", 'no-tag');
         
+        %Find cultivation type (overwrites default type if a new type is found in the name)
         for cultivation = 1:length(cultivations_search_words)
-            if contains(lower(all_images{i}(k).name), cultivations_search_words(cultivation))
+            if contains(lower(s.file_name), cultivations_search_words(cultivation))
                 s.cultivation_index = cultivation;
                 break;
             end
         end
         
+        %Find shoot type (overwrites default type if a new type is found in the name)
         for shoot = 1:length(shoots_search_words)
-            if contains(lower(all_images{i}(k).name), shoots_search_words(shoot))
+            if contains(lower(s.file_name), shoots_search_words(shoot))
                 s.shoot_index = shoot;
                 break;
             end
         end
         
-        collection{current_index, 1} = imrotate(imread(s.file_name), -90);
-        collection{current_index, 2} = s;
-        fprintf("'%s':\t%s\t%s\t%s\n", collection{current_index, 2}.file_name, farms{collection{current_index, 2}.farm_index}, cultivations{collection{current_index, 2}.cultivation_index}, shoots{collection{current_index, 2}.shoot_index});
+        %Save tag name. A substing is a tag i it starts with a number and doesn't contain '.JPG' (overwrites default type if a new type is found in the name)
+        parts = split(upper(s.file_name));
+        for p = 1:length(parts)
+            str = parts{p};
+            if(~contains(str, '.JPG'))
+                if(ismember(str(1), '0123456789'))
+                    s.pair_tag = str;
+                    break;
+                end
+            end
+        end
+        
+        %If there is not a cultivation set and the farm is Multorp and there exists a
+        %pair_tag and if the pair tag only contains numbers, then the
+        %cultivation can be extracted.
+        %{
+            Samples 50-59 are Belinda
+            Samples 63-72 are Fatima
+            Samples 74-83 are Symphony
+        %index layout --> cultivations = {'Belinda', 'Fatima', 'Symphony', 'Unkown'};
+        %}
+        if(s.cultivation_index == length(cultivations) && s.farm_index == length(farms) && ~strcmp(s.pair_tag, 'no-tag'))
+            if (all(ismember(s.pair_tag, '0123456789')))
+                num = str2num(s.pair_tag);
+                
+                if (num >= 50 && num <= 59)
+                    s.cultivation_index = 1;
+                elseif (num >= 63 && num <= 72)
+                    s.cultivation_index = 2;
+                elseif (num >= 74 && num <= 83)
+                    s.cultivation_index = 3;
+                end
+                
+            end
+        end
+        
+        collection{current_index, 1} = imrotate(imread(s.file_name), -90);%Rotate all images 90 degrees clockwise
+        collection{current_index, 2} = s; %Store the tags for the current image.
+        fprintf("'%s': \t %s \t %s \t %s \t %s \n", upper(collection{current_index, 2}.file_name), upper(farms{collection{current_index, 2}.farm_index}), upper(cultivations{collection{current_index, 2}.cultivation_index}), upper(shoots{collection{current_index, 2}.shoot_index}), upper(collection{current_index, 2}.pair_tag));
         
     end
     
@@ -222,7 +256,7 @@ for index = 1:length(collection(:, 1))
         fprintf("\n");
     end
     fprintf("%d\t", index);
-    title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}];
+    title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}, ' ', collection{current_index, 2}.pair_tag];
 
     
     figure('name', title_string);
@@ -239,51 +273,82 @@ close all; clc;
 
 random_index = randi(number_of_images);
 random_index_pair = 0;
+
+%find the respective pair for the current random image: (Resulting in a pair of Huvudskott and Gronskott)
 for i = 1:number_of_images
-    if(collection{i, 2}.farm_index == collection{random_index, 2}.farm_index && collection{i, 2}.cultivation_index == collection{random_index, 2}.cultivation_index && collection{i, 2}.shoot_index ~= collection{random_index, 2}.shoot_index)
+    check_farm_index = (collection{i, 2}.farm_index == collection{random_index, 2}.farm_index);
+    check_cultivation_index = (collection{i, 2}.cultivation_index == collection{random_index, 2}.cultivation_index);
+    check_shoot_index = (collection{i, 2}.shoot_index ~= collection{random_index, 2}.shoot_index);
+    check_pair_tag = strcmp(collection{i, 2}.pair_tag, collection{random_index, 2}.pair_tag);
+    
+    if(check_farm_index && check_cultivation_index && check_shoot_index && check_pair_tag)
         random_index_pair = i;
         break;
     end
 end
 
-img = im2double(collection{random_index, 1});
-filter_mask = get_filter_mask(rgb2gray(img));
-cc = bwconncomp(filter_mask);
+%Present statistics for the pair of Huvudskott and Gronskott
+for index = [random_index, random_index_pair]
+    %Print index and tags for current image
+    title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}, ' ', collection{current_index, 2}.pair_tag];
+    fprintf("%s\n", title_string);
+    
+    %Compute the binary mask for the image.
+    img = im2double(collection{index, 1});
+    filter_mask = get_filter_mask(rgb2gray(img));
+    
+    %Compute regions in the binary mask and present statistics for Area, MinorAxisLength and MajorAxisLength
+    cc = bwconncomp(filter_mask);
+    
+    areas = regionprops(cc, 'Area');
+    areas = reshape(struct2array(areas), [], numel(fieldnames(areas)));%Convert from struct to vector
+    fprintf("Area: average = %.3f, median = %.3f, std = %.3f\n", mean(areas), median(areas), std(areas))
 
-filter_mask_rgb = filter_mask .* img;
-imshow(img)
-figure
-imshow(filter_mask_rgb)
+    min_axis = regionprops(cc, 'MinorAxisLength');
+    min_axis = reshape(struct2array(min_axis), [], numel(fieldnames(min_axis)));%Convert from struct to vector
+    fprintf("MinorAxisLength: average = %.3f, median = %.3f, std = %.3f\n", mean(min_axis), median(min_axis), std(min_axis))
 
-filter_mask_hsv = rgb2hsv(filter_mask_rgb);
+    max_axis = regionprops(cc, 'MajorAxisLength');
+    max_axis = reshape(struct2array(max_axis), [], numel(fieldnames(max_axis)));%Convert from struct to vector
+    fprintf("MajorAxisLength: average = %.3f, median = %.3f, std = %.3f\n\n", mean(max_axis), median(max_axis), std(max_axis))
 
-areas = regionprops(cc, 'Area');
-areas = reshape(struct2array(areas), [], numel(fieldnames(areas)));
-fprintf("Area: average = %.3f, median = %.3f, std = %.3f\n", mean(areas), median(areas), std(areas))
+    
+    %Multiply the current image with the binary mask, then convert the masked RGB image to HSV.
+    filter_mask_rgb = filter_mask .* img;
+    filter_mask_hsv = rgb2hsv(filter_mask_rgb);
+    
+    %Separate rgb and hsv values into separtate row vector for simpler use of the functions: mean(), median() and std()
+    r = filter_mask_rgb(:, :, 1); r = r(:);
+    g = filter_mask_rgb(:, :, 2); g = g(:);
+    b = filter_mask_rgb(:, :, 3); b = b(:);
 
-min_axis = regionprops(cc, 'MinorAxisLength');
-min_axis = reshape(struct2array(min_axis), [], numel(fieldnames(min_axis)));
-fprintf("MinorAxisLength: average = %.3f, median = %.3f, std = %.3f\n", mean(min_axis), median(min_axis), std(min_axis))
+    h = filter_mask_hsv(:, :, 1); h = h(:);
+    s = filter_mask_hsv(:, :, 2); s = s(:);
+    v = filter_mask_hsv(:, :, 3); v = v(:);
+    
+    %Don't calculate statistics for parts outside the binary mask. Outside meaning where the binary mask is equal 0.
+    remove_zeros = find(filter_mask == 0);
+    r(remove_zeros) = [];
+    g(remove_zeros) = [];
+    b(remove_zeros) = [];
+    h(remove_zeros) = [];
+    s(remove_zeros) = [];
+    v(remove_zeros) = [];
 
-max_axis = regionprops(cc, 'MajorAxisLength');
-max_axis = reshape(struct2array(max_axis), [], numel(fieldnames(max_axis)));
-fprintf("MajorAxisLength: average = %.3f, median = %.3f, std = %.3f\n\n", mean(max_axis), median(max_axis), std(max_axis))
-
-remove_zeros = find(filter_mask == 0);
-r = filter_mask_rgb(:, :, 1); r = r(:); r(remove_zeros) = [];
-g = filter_mask_rgb(:, :, 2); g = g(:); g(remove_zeros) = [];
-b = filter_mask_rgb(:, :, 3); b = b(:); b(remove_zeros) = [];
-
-h = filter_mask_hsv(:, :, 1); h = h(:); h(remove_zeros) = [];
-s = filter_mask_hsv(:, :, 2); s = s(:); s(remove_zeros) = [];
-v = filter_mask_hsv(:, :, 3); v = v(:); v(remove_zeros) = [];
-
-fprintf("r: average = %.3f, median = %.3f, std = %.3f\n", mean(r, 'all'), median(r, 'all'), std(r))
-fprintf("g: average = %.3f, median = %.3f, std = %.3f\n", mean(g, 'all'), median(g, 'all'), std(g))
-fprintf("b: average = %.3f, median = %.3f, std = %.3f\n\n", mean(b, 'all'), median(b, 'all'), std(b))
-fprintf("h: average = %.3f, median = %.3f, std = %.3f\n", mean(h, 'all'), median(h, 'all'), std(h))
-fprintf("s: average = %.3f, median = %.3f, std = %.3f\n", mean(s, 'all'), median(s, 'all'), std(s))
-fprintf("v: average = %.3f, median = %.3f, std = %.3f\n", mean(v, 'all'), median(v, 'all'), std(v))
+    %Present statistics for RGB and HSV
+    fprintf("r: average = %.3f, median = %.3f, std = %.3f\n", mean(r), median(r), std(r))
+    fprintf("g: average = %.3f, median = %.3f, std = %.3f\n", mean(g), median(g), std(g))
+    fprintf("b: average = %.3f, median = %.3f, std = %.3f\n\n", mean(b), median(b), std(b))
+    fprintf("h: average = %.3f, median = %.3f, std = %.3f\n", mean(h), median(h), std(h))
+    fprintf("s: average = %.3f, median = %.3f, std = %.3f\n", mean(s), median(s), std(s))
+    fprintf("v: average = %.3f, median = %.3f, std = %.3f\n\n\n", mean(v), median(v), std(v))
+    
+    
+    %Display current image and the image multiplied by the binary mask.
+    figure('name', title_string);
+    subplot(1, 2, 1); imshow(img);
+    subplot(1, 2, 2); imshow(filter_mask_rgb)
+end
 
 
 
