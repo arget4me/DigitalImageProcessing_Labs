@@ -157,8 +157,6 @@ end
 %% 2.1 Scientific background and data
 clear all; close all; clc;
 
-%@QUESTION: Change structure inside matlab, or manually in folder??
-
 cd images/Oats
     addpath('Gotala 50 corns')
     addpath('Lanna 50 corns')
@@ -215,85 +213,79 @@ end
 
 
 %% 2.2 Segmentation
-
 close all; clc;
+%issue_img = [15, 55, 57, 47, 40, 33, 59]
 fprintf("\nCurrent index:");
 for index = 1:length(collection(:, 1))
+    
     if mod(index - 1, 10) == 0
         fprintf("\n");
     end
     fprintf("%d\t", index);
     title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}];
 
+    
     figure('name', title_string);
     subplot(1, 2, 1); imshow(collection{index, 1})
+
     img = im2double(rgb2gray(collection{index, 1}));
-    img = (img - min(img, [], 'all')) ./ ( max(img, [], 'all') - min(img, [], 'all') );
-    img_grayscale = imbilatfilt(img, 0.3, 8, 'NeighborhoodSize', 9);
-    img = img_grayscale > 0.6;
+    filter_mask = get_filter_mask(img);
     
-    
-    cc = bwconncomp(img);
-    areas = regionprops(cc, 'Area');
-    x = reshape(struct2array(areas), [], numel(fieldnames(areas)));
-
-    img_remove = zeros(size(img));
-    
-    remove_areas_small = find(x < 600);
-    for i = 1:length(remove_areas_small)
-        current_region = cc.PixelIdxList{remove_areas_small(i)}; 
-
-        for k = 1:length(current_region)
-            img_remove(current_region(k)) = 1;
-        end
-    end
-    
-     remove_areas_big = find(x > 8000);
-    for i = 1:length(remove_areas_big)
-        current_region = cc.PixelIdxList{remove_areas_big(i)}; 
-
-        y_min = size(img, 1);
-        y_max = 0;
-        x_min = size(img, 2);
-        x_max = 0;
-        for k = 1:length(current_region)
-            [row, col] = ind2sub(size(img), current_region(k));
-           
-            if row < y_min
-                y_min = row;
-            end
-            
-            if row > y_max
-                y_max = row;
-            end
-            
-            if col < x_min
-                x_min = col;
-            end
-            
-            if col > x_max
-                x_max = col;
-            end
-        end
-        
-        
-        for col = x_min:x_max
-            for row = y_min:y_max
-            	img_remove(row, col) = 1;
-            end
-        end
-        
-    end
-    img = img - img_remove;
-    img = img > 0.5;
-    
-    subplot(1, 2, 2); imshow(img)
-    
-    img_grayscale = img_grayscale + 0.9 * img;
-    subplot(1, 2, 1); imshow(img_grayscale, [])
+    subplot(1, 2, 2); imshow(filter_mask)
 end
 
 %% 2.3 Object identification and statistisc collection
+close all; clc;
+
+random_index = randi(number_of_images);
+random_index_pair = 0;
+for i = 1:number_of_images
+    if(collection{i, 2}.farm_index == collection{random_index, 2}.farm_index && collection{i, 2}.cultivation_index == collection{random_index, 2}.cultivation_index && collection{i, 2}.shoot_index ~= collection{random_index, 2}.shoot_index)
+        random_index_pair = i;
+        break;
+    end
+end
+
+img = im2double(collection{random_index, 1});
+filter_mask = get_filter_mask(rgb2gray(img));
+cc = bwconncomp(filter_mask);
+
+filter_mask_rgb = filter_mask .* img;
+imshow(img)
+figure
+imshow(filter_mask_rgb)
+
+filter_mask_hsv = rgb2hsv(filter_mask_rgb);
+
+areas = regionprops(cc, 'Area');
+areas = reshape(struct2array(areas), [], numel(fieldnames(areas)));
+fprintf("Area: average = %.3f, median = %.3f, std = %.3f\n", mean(areas), median(areas), std(areas))
+
+min_axis = regionprops(cc, 'MinorAxisLength');
+min_axis = reshape(struct2array(min_axis), [], numel(fieldnames(min_axis)));
+fprintf("MinorAxisLength: average = %.3f, median = %.3f, std = %.3f\n", mean(min_axis), median(min_axis), std(min_axis))
+
+max_axis = regionprops(cc, 'MajorAxisLength');
+max_axis = reshape(struct2array(max_axis), [], numel(fieldnames(max_axis)));
+fprintf("MajorAxisLength: average = %.3f, median = %.3f, std = %.3f\n\n", mean(max_axis), median(max_axis), std(max_axis))
+
+remove_zeros = find(filter_mask == 0);
+r = filter_mask_rgb(:, :, 1); r = r(:); r(remove_zeros) = [];
+g = filter_mask_rgb(:, :, 2); g = g(:); g(remove_zeros) = [];
+b = filter_mask_rgb(:, :, 3); b = b(:); b(remove_zeros) = [];
+
+h = filter_mask_hsv(:, :, 1); h = h(:); h(remove_zeros) = [];
+s = filter_mask_hsv(:, :, 2); s = s(:); s(remove_zeros) = [];
+v = filter_mask_hsv(:, :, 3); v = v(:); v(remove_zeros) = [];
+
+fprintf("r: average = %.3f, median = %.3f, std = %.3f\n", mean(r, 'all'), median(r, 'all'), std(r))
+fprintf("g: average = %.3f, median = %.3f, std = %.3f\n", mean(g, 'all'), median(g, 'all'), std(g))
+fprintf("b: average = %.3f, median = %.3f, std = %.3f\n\n", mean(b, 'all'), median(b, 'all'), std(b))
+fprintf("h: average = %.3f, median = %.3f, std = %.3f\n", mean(h, 'all'), median(h, 'all'), std(h))
+fprintf("s: average = %.3f, median = %.3f, std = %.3f\n", mean(s, 'all'), median(s, 'all'), std(s))
+fprintf("v: average = %.3f, median = %.3f, std = %.3f\n", mean(v, 'all'), median(v, 'all'), std(v))
+
+
 
 %% 2.4 From image coordinates to world size
 
