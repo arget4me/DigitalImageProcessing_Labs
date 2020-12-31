@@ -302,15 +302,15 @@ for index = [random_index, random_index_pair]
     
     areas = regionprops(cc, 'Area');
     areas = reshape(struct2array(areas), [], numel(fieldnames(areas)));%Convert from struct to vector
-    fprintf("Area: average = %.3f, median = %.3f, std = %.3f\n", mean(areas), median(areas), std(areas))
+    fprintf("Area: average = %.3fpx^2, median = %.3fpx^2, std = %.3fpx^2\n", mean(areas), median(areas), std(areas))
 
     min_axis = regionprops(cc, 'MinorAxisLength');
     min_axis = reshape(struct2array(min_axis), [], numel(fieldnames(min_axis)));%Convert from struct to vector
-    fprintf("MinorAxisLength: average = %.3f, median = %.3f, std = %.3f\n", mean(min_axis), median(min_axis), std(min_axis))
+    fprintf("MinorAxisLength: average = %.3fpx, median = %.3fpx, std = %.3fpx\n", mean(min_axis), median(min_axis), std(min_axis))
 
     max_axis = regionprops(cc, 'MajorAxisLength');
     max_axis = reshape(struct2array(max_axis), [], numel(fieldnames(max_axis)));%Convert from struct to vector
-    fprintf("MajorAxisLength: average = %.3f, median = %.3f, std = %.3f\n\n", mean(max_axis), median(max_axis), std(max_axis))
+    fprintf("MajorAxisLength: average = %.3fpx, median = %.3fpx, std = %.3fpx\n\n", mean(max_axis), median(max_axis), std(max_axis))
 
     
     %Multiply the current image with the binary mask, then convert the masked RGB image to HSV.
@@ -354,4 +354,106 @@ end
 
 %% 2.4 From image coordinates to world size
 
+close all; clc;
+
+random_index = randi(number_of_images);
+random_index_pair = 0;
+
+%find the respective pair for the current random image: (Resulting in a pair of Huvudskott and Gronskott)
+for i = 1:number_of_images
+    check_farm_index = (collection{i, 2}.farm_index == collection{random_index, 2}.farm_index);
+    check_cultivation_index = (collection{i, 2}.cultivation_index == collection{random_index, 2}.cultivation_index);
+    check_shoot_index = (collection{i, 2}.shoot_index ~= collection{random_index, 2}.shoot_index);
+    check_pair_tag = strcmp(collection{i, 2}.pair_tag, collection{random_index, 2}.pair_tag);
+    
+    if(check_farm_index && check_cultivation_index && check_shoot_index && check_pair_tag)
+        random_index_pair = i;
+        break;
+    end
+end
+
+%Present statistics for the pair of Huvudskott and Gronskott
+for index = [random_index, random_index_pair]
+    %Print index and tags for current image
+    title_string = [num2str(index), ': ', farms{collection{index, 2}.farm_index},' ', cultivations{collection{index, 2}.cultivation_index},' ',shoots{collection{index, 2}.shoot_index}, ' ', collection{current_index, 2}.pair_tag];
+    fprintf("%s\n", title_string);
+    
+    %Compute the binary mask for the image.
+    img = im2double(collection{index, 1});
+    statistics = image_statistics(img, 0);
+    fprintf("Num kernels = %d\n", statistics(1));
+
+    fprintf("Area: average = %.3fmm^2, median = %.3fmm^2\n", statistics(2), statistics(3))
+
+    fprintf("MinorAxisLength: average = %.3fmm, median = %.3fmm\n", statistics(4), statistics(5))
+
+    fprintf("MajorAxisLength: average = %.3fmm, median = %.3fmm\n\n", statistics(6), statistics(7))
+
+
+    %Present statistics for RGB and HSV
+    fprintf("r: average = %.3f, median = %.3f\n", statistics(8), statistics(9))
+    fprintf("g: average = %.3f, median = %.3f\n", statistics(10), statistics(11))
+    fprintf("b: average = %.3f, median = %.3f\n\n", statistics(12), statistics(13))
+    fprintf("h: average = %.3f, median = %.3f\n", statistics(14), statistics(15))
+    fprintf("s: average = %.3f, median = %.3f\n", statistics(16), statistics(17))
+    fprintf("v: average = %.3f, median = %.3f\n\n\n", statistics(18), statistics(19))
+end
+
+
 %% 2.5 Answering the research questions
+close all; clc;
+clear all_statistics;
+%column layout: 'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'
+categories_names = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
+statistics_names = {'Number of kernels', 'Average area', 'Median area', 'Average MinorAxisLength', 'Median MinorAxisLength', 'Average MajorAxisLength', 'Median MajorAxisLength', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
+
+shoot_index_offset = 0;
+farm_index_offset = shoot_index_offset + 2;
+cultivation_index_offset = farm_index_offset + 3;
+num_columns = 2 + 3 + 3;%2shots, 3farms, 3cultivations
+num_statistics = 19;
+
+all_statistics{num_statistics, num_columns} = [];
+
+
+%for index = 1:number_of_images
+for index = 1:number_of_images
+    fprintf("Calculating statistics for image: %d\n", index);
+    img = im2double(collection{index, 1});
+    
+    statistics = image_statistics(img, 0);
+    tags = collection{index, 2};
+    fprintf("\tstoring statistics\n");
+    for k = 1:num_statistics
+        column = shoot_index_offset + tags.shoot_index;
+        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
+        
+        column = farm_index_offset + tags.farm_index;
+        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
+        
+        column = cultivation_index_offset + tags.cultivation_index;
+        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
+    end
+    fprintf("\tdone with image: %d\n\n", index);
+end
+
+
+%Present one boxplot for each statistics
+for i = 1:num_statistics
+    data = [cell2mat(all_statistics{i, 1}); cell2mat(all_statistics{i, 2}); cell2mat(all_statistics{i, 3}); cell2mat(all_statistics{i, 4}); cell2mat(all_statistics{i, 5}); cell2mat(all_statistics{i, 6}); cell2mat(all_statistics{i, 7}); cell2mat(all_statistics{i, 8})];
+    
+    current_label_index = 1;
+    label = [""];
+    for k = 1:8
+        num_components = length(all_statistics{i, k});
+        for x = 1:num_components
+            label(current_label_index, 1) = convertCharsToStrings(categories_names{k});
+            current_label_index = current_label_index + 1;
+        end
+    end
+    
+    figure
+    boxplot(data, label);
+    ylabel(statistics_names{i});
+end
+
