@@ -403,6 +403,79 @@ end
 %% 2.5 Answering the research questions
 close all; clc;
 clear all_statistics;
+clear categories_names;
+
+%column layout: 'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'
+%categories_names = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
+statistics_names = {'Number of kernels', 'Average area', 'Median area', 'Average MinorAxisLength', 'Median MinorAxisLength', 'Average MajorAxisLength', 'Median MajorAxisLength', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
+
+shoots = {'H', 'G'};
+farms = {'Ö', 'L', 'M'};
+cultivations = {'B', 'F', 'S'};
+ 
+shoot_index_offset = 0;
+farm_index_offset = shoot_index_offset + length(shoots);
+cultivation_index_offset = farm_index_offset + length(farms);
+num_columns =  length(shoots) * length(farms) * length(cultivations);%2shots, 3farms, 3cultivations
+num_statistics = 19;
+
+categories_names{num_columns} = '';
+
+for s = 1:length(shoots)
+    for f = 1:length(farms)
+        for c = 1:length(cultivations)
+            column = (s -1) * (length(farms) * length(cultivations)) + (f-1) * length(cultivations) + c;
+            categories_names{column} = [shoots{s},'.',farms{f},'.', cultivations{c}];
+        end
+    end
+end
+
+all_statistics{num_statistics, num_columns} = [];
+
+
+for index = 1:number_of_images
+%for index = 1:15
+    fprintf("Calculating statistics for image: %d\n", index);
+    img = im2double(collection{index, 1});
+    
+    statistics = image_statistics(img, 0);
+    tags = collection{index, 2};
+    fprintf("\tstoring statistics\n");
+    for k = 1:num_statistics
+        s = tags.shoot_index;
+        f = tags.farm_index;
+        c = tags.cultivation_index;
+        column = (s -1) * (length(farms) * length(cultivations)) + (f-1) * length(cultivations) + c;
+        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
+    end
+    fprintf("\tdone with image: %d\n\n", index);
+end
+
+
+%Present one boxplot for each statistics
+for i = 1:num_statistics
+    data = [];
+    
+    current_label_index = 1;
+    label = [""];
+    for k = 1:num_columns
+        num_components = length(all_statistics{i, k});
+        data = [data; cell2mat(all_statistics{i, k})];
+        for x = 1:num_components
+            label(current_label_index, 1) = convertCharsToStrings(categories_names{k});
+            current_label_index = current_label_index + 1;
+        end
+    end
+    
+    figure
+    boxplot(data, label);
+    ylabel(statistics_names{i});
+end
+
+
+
+%{
+%% Old code, single statistics only
 %column layout: 'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'
 categories_names = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
 statistics_names = {'Number of kernels', 'Average area', 'Median area', 'Average MinorAxisLength', 'Median MinorAxisLength', 'Average MajorAxisLength', 'Median MajorAxisLength', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
@@ -456,4 +529,5 @@ for i = 1:num_statistics
     boxplot(data, label);
     ylabel(statistics_names{i});
 end
+%}
 
