@@ -72,7 +72,7 @@ imshow(I); hold on;
 plot(pts.selectStrongest(50)); hold off;
 
 
-%%1.2 Feature extraction
+%% 1.2 Feature extraction
 
 % detect SURF features
 pts = detectSURFFeatures(I);
@@ -82,7 +82,7 @@ fprintf("number of validPts = %.1f\nnumber of pts = %.1f\n", length(validPts), l
 
 
 
-%%1.3 Feature matching
+%% 1.3 Feature matching
 
 % read image file
 I1 = imread('graffiti1.png');
@@ -236,7 +236,7 @@ for i = 1:length(all_images)
             end
         end
         
-        collection{current_index, 1} = imrotate(imread(s.file_name), -90);%Rotate all images 90 degrees clockwise
+        collection{current_index, 1} = imrotate(imread(s.file_name), -90);%Rotate all images 90 degrees clockwise then store the rotated image.
         collection{current_index, 2} = s; %Store the tags for the current image.
         fprintf("'%s': \t %s \t %s \t %s \t %s \n", upper(collection{current_index, 2}.file_name), upper(farms{collection{current_index, 2}.farm_index}), upper(cultivations{collection{current_index, 2}.cultivation_index}), upper(shoots{collection{current_index, 2}.shoot_index}), upper(collection{current_index, 2}.pair_tag));
         
