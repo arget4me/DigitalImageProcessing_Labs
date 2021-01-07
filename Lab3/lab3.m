@@ -400,134 +400,165 @@ for index = [random_index, random_index_pair]
 end
 
 
-%% 2.5 Answering the research questions
-close all; clc;
-clear all_statistics;
-clear categories_names;
+%% 2.5 Answering the research questions 
 
-%column layout: 'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'
-%categories_names = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
-statistics_names = {'Number of kernels', 'Average area', 'Median area', 'Average MinorAxisLength', 'Median MinorAxisLength', 'Average MajorAxisLength', 'Median MajorAxisLength', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
+%First loop through all images and comupte the image statistics using the
+%function from the previous task. (image_statistics)
+%Then store the result to a .mat file to remove the need to recalculate the
+%statistics each time.
 
-shoots = {'H', 'G'};
-farms = {'Ö', 'L', 'M'};
-cultivations = {'B', 'F', 'S'};
- 
-shoot_index_offset = 0;
-farm_index_offset = shoot_index_offset + length(shoots);
-cultivation_index_offset = farm_index_offset + length(farms);
-num_columns =  length(shoots) * length(farms) * length(cultivations);%2shots, 3farms, 3cultivations
-num_statistics = 19;
-
-categories_names{num_columns} = '';
-
-for s = 1:length(shoots)
-    for f = 1:length(farms)
-        for c = 1:length(cultivations)
-            column = (s -1) * (length(farms) * length(cultivations)) + (f-1) * length(cultivations) + c;
-            categories_names{column} = [shoots{s},'.',farms{f},'.', cultivations{c}];
-        end
-    end
-end
-
-all_statistics{num_statistics, num_columns} = [];
-
-
+%The statistics for every image along with their respective tags are first
+%stored in a collection. 
+%The rows represent the image index,
+%The first column holds the image statistics in a vector.
+%The second column holds the image tags in a struct.
+image_statistics_stored{number_of_images, 2} = [];
 for index = 1:number_of_images
-%for index = 1:15
     fprintf("Calculating statistics for image: %d\n", index);
     img = im2double(collection{index, 1});
     
-    statistics = image_statistics(img, 0);
-    tags = collection{index, 2};
-    fprintf("\tstoring statistics\n");
+    image_statistics_stored{index, 1} = image_statistics(img, 0);
+    image_statistics_stored{index, 2} = collection{index, 2};
+end
+
+%Save the collection of image statistics to the file 'image_statistics_stored.mat'
+save('image_statistics_stored.mat', 'image_statistics_stored', '-nocompression')
+
+
+
+
+%% Show statistics for shoot/farm/cultivation separate of each other 
+clear all; close all; clc;
+load('image_statistics_stored.mat'); %Load the image statistics from file.
+
+shoots = {'Huvudskott', 'Gronskott'};
+farms = {'Gotala', 'Lanna', 'Multorp'};
+cultivations = {'Belinda', 'Fatima', 'Symphony'};
+
+number_of_images = length(image_statistics_stored(:, 1))
+
+shoot_index_offset = 0;
+farm_index_offset = shoot_index_offset + length(shoots);
+cultivation_index_offset = farm_index_offset + length(farms);
+num_columns =  length(shoots) + length(farms) + length(cultivations); %2shots, 3farms, 3cultivations
+num_statistics = 19;
+
+all_statistics_single{num_statistics, num_columns} = [];
+for index = 1:number_of_images
+    fprintf("Ordering statistics for image: %d\n", index);
+    
+    statistics = image_statistics_stored{index, 1};
+    tags = image_statistics_stored{index, 2};
+    
+    for k = 1:num_statistics
+        column = shoot_index_offset + tags.shoot_index;
+        all_statistics_single{k, column}{length(all_statistics_single{k, column}) + 1, 1} = statistics(k);
+        
+        column = farm_index_offset + tags.farm_index;
+        all_statistics_single{k, column}{length(all_statistics_single{k, column}) + 1, 1} = statistics(k);
+        
+        column = cultivation_index_offset + tags.cultivation_index;
+        all_statistics_single{k, column}{length(all_statistics_single{k, column}) + 1, 1} = statistics(k);
+    end
+end
+
+
+% Present one boxplot for each statistics single´
+statistics_names = {'Number of kernels', 'Average area (mm^2)', 'Median area (mm^2)', 'Average MinorAxisLength (mm)', 'Median MinorAxisLength (mm)', 'Average MajorAxisLength (mm)', 'Median MajorAxisLength (mm)', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
+categories_names_single = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
+
+for i = 1:length(statistics_names)
+    %Place all data i a column vector.
+    shoot_data = [cell2mat(all_statistics_single{i, 1}); cell2mat(all_statistics_single{i, 2});];
+    farm_data = [cell2mat(all_statistics_single{i, 3}); cell2mat(all_statistics_single{i, 4}); cell2mat(all_statistics_single{i, 5});];
+    cultivation_data = [cell2mat(all_statistics_single{i, 6}); cell2mat(all_statistics_single{i, 7}); cell2mat(all_statistics_single{i, 8})];
+    
+    shoot_label = [""]; shoot_label(1:length(all_statistics_single{i, 1}), 1) = convertCharsToStrings(categories_names_single{1});
+    shoot_label((end + 1):(end + length(all_statistics_single{i, 2})), 1) = convertCharsToStrings(categories_names_single{2});
+    
+    farm_label = [""]; farm_label(1:length(all_statistics_single{i, 3}), 1) = convertCharsToStrings(categories_names_single{3});
+    farm_label((end + 1):(end + length(all_statistics_single{i, 4})), 1) = convertCharsToStrings(categories_names_single{4});
+    farm_label((end + 1):(end + length(all_statistics_single{i, 5})), 1) = convertCharsToStrings(categories_names_single{5});
+    
+    cultivation_label = [""]; cultivation_label(1:length(all_statistics_single{i, 6}), 1) = convertCharsToStrings(categories_names_single{6});
+    cultivation_label((end + 1):(end + length(all_statistics_single{i, 7})), 1) = convertCharsToStrings(categories_names_single{7});
+    cultivation_label((end + 1):(end + length(all_statistics_single{i, 8})), 1) = convertCharsToStrings(categories_names_single{8});
+    
+    
+    %Display boxplots
+    figure; boxplot(shoot_data, shoot_label);
+    ylabel(statistics_names{i}); title("Shoots");
+    
+    figure; boxplot(farm_data, farm_label);
+    ylabel(statistics_names{i}); title("Farms");
+    
+    figure; boxplot(cultivation_data, cultivation_label);
+    ylabel(statistics_names{i}); title("Cultivations");
+    
+end
+
+
+%% Show statistics for all combinations of shoot/farm/cultivation
+clear all; close all; clc;
+load('image_statistics_stored.mat'); %Load the image statistics from file.
+
+shoots = {'Huvudskott', 'Gronskott'};
+farms = {'Gotala', 'Lanna', 'Multorp'};
+cultivations = {'Belinda', 'Fatima', 'Symphony'};
+
+number_of_images = length(image_statistics_stored(:, 1))
+
+%orginize statistics data for boxplot presentation
+num_columns =  length(shoots) * length(farms) * length(cultivations);%2shots, 3farms, 3cultivations
+num_statistics = 19;
+all_statistics_combination{num_statistics, num_columns} = [];
+for index = 1:number_of_images
+    fprintf("Ordering statistics for image: %d\n", index);
+    
+    statistics = image_statistics_stored{index, 1};
+    tags = image_statistics_stored{index, 2};
+    
     for k = 1:num_statistics
         s = tags.shoot_index;
         f = tags.farm_index;
         c = tags.cultivation_index;
         column = (s -1) * (length(farms) * length(cultivations)) + (f-1) * length(cultivations) + c;
-        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
+        all_statistics_combination{k, column}{length(all_statistics_combination{k, column}) + 1, 1} = statistics(k);
     end
-    fprintf("\tdone with image: %d\n\n", index);
 end
 
 
-%Present one boxplot for each statistics
-for i = 1:num_statistics
-    data = [];
-    
-    current_label_index = 1;
-    label = [""];
-    for k = 1:num_columns
-        num_components = length(all_statistics{i, k});
-        data = [data; cell2mat(all_statistics{i, k})];
-        for x = 1:num_components
-            label(current_label_index, 1) = convertCharsToStrings(categories_names{k});
-            current_label_index = current_label_index + 1;
+% Present one boxplot for each statistics combination
+statistics_names = {'Number of kernels', 'Average area (mm^2)', 'Median area (mm^2)', 'Average MinorAxisLength (mm)', 'Median MinorAxisLength (mm)', 'Average MajorAxisLength (mm)', 'Median MajorAxisLength (mm)', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
+
+%Build all combinations names
+shoots = {'H', 'G'};
+farms = {'Ö', 'L', 'M'};
+cultivations = {'B', 'F', 'S'};
+num_columns =  length(shoots) * length(farms) * length(cultivations);%2shots, 3farms, 3cultivations
+categories_names_combination{num_columns} = '';
+for s = 1:length(shoots)
+    for f = 1:length(farms)
+        for c = 1:length(cultivations)
+            column = (s -1) * (length(farms) * length(cultivations)) + (f-1) * length(cultivations) + c;
+            categories_names_combination{column} = [shoots{s},'.',farms{f},'.', cultivations{c}];
         end
     end
-    
-    figure
-    boxplot(data, label);
-    ylabel(statistics_names{i});
 end
 
 
-
-%{
-%% Old code, single statistics only
-%column layout: 'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'
-categories_names = {'Huvudskott', 'Gronskott', 'Gotala', 'Lanna', 'Multorp', 'Belinda', 'Fatima', 'Symphony'};
-statistics_names = {'Number of kernels', 'Average area', 'Median area', 'Average MinorAxisLength', 'Median MinorAxisLength', 'Average MajorAxisLength', 'Median MajorAxisLength', 'Average r', 'Median r', 'Average g', 'Median g', 'Average b', 'Median b', 'Average h', 'Median h', 'Average s', 'Median s','Average v', 'Median v'};
-
-shoot_index_offset = 0;
-farm_index_offset = shoot_index_offset + 2;
-cultivation_index_offset = farm_index_offset + 3;
-num_columns = 2 + 3 + 3;%2shots, 3farms, 3cultivations
-num_statistics = 19;
-
-all_statistics{num_statistics, num_columns} = [];
-
-
-%for index = 1:number_of_images
-for index = 1:number_of_images
-    fprintf("Calculating statistics for image: %d\n", index);
-    img = im2double(collection{index, 1});
-    
-    statistics = image_statistics(img, 0);
-    tags = collection{index, 2};
-    fprintf("\tstoring statistics\n");
-    for k = 1:num_statistics
-        column = shoot_index_offset + tags.shoot_index;
-        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
-        
-        column = farm_index_offset + tags.farm_index;
-        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
-        
-        column = cultivation_index_offset + tags.cultivation_index;
-        all_statistics{k, column}{length(all_statistics{k, column}) + 1, 1} = statistics(k);
-    end
-    fprintf("\tdone with image: %d\n\n", index);
-end
-
-
-%Present one boxplot for each statistics
-for i = 1:num_statistics
-    data = [cell2mat(all_statistics{i, 1}); cell2mat(all_statistics{i, 2}); cell2mat(all_statistics{i, 3}); cell2mat(all_statistics{i, 4}); cell2mat(all_statistics{i, 5}); cell2mat(all_statistics{i, 6}); cell2mat(all_statistics{i, 7}); cell2mat(all_statistics{i, 8})];
-    
-    current_label_index = 1;
-    label = [""];
-    for k = 1:8
-        num_components = length(all_statistics{i, k});
-        for x = 1:num_components
-            label(current_label_index, 1) = convertCharsToStrings(categories_names{k});
-            current_label_index = current_label_index + 1;
-        end
+%Prestent statistics as boxplot
+for i = 1:length(statistics_names)
+    %Place all data i a column vector.
+    label = [""]; label(1:length(all_statistics_combination{i, 1}), 1) = convertCharsToStrings(categories_names_combination{1});
+    data = cell2mat(all_statistics_combination{i, 1});
+    for k = 2:num_columns
+        num_components = length(all_statistics_combination{i, k});
+        data = [data; cell2mat(all_statistics_combination{i, k})];
+        label((end + 1):(end + num_components), 1) = convertCharsToStrings(categories_names_combination{k});
     end
     
-    figure
-    boxplot(data, label);
-    ylabel(statistics_names{i});
+    %Display boxplot
+    figure; boxplot(data, label);
+    ylabel(statistics_names{i}); title("All combinations of shoots/farms/cultivations");
 end
-%}
-
