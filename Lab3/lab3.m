@@ -16,9 +16,8 @@ addpath('Oats');
 cd ..
 
 figure('name', 'NumOctaves = 3 vs NumOctaves = 1')
-%NumOctaves' decide on the maximum sizes of the blobs
-
 subplot(1, 2,1);
+%NumOctaves' decide on the maximum sizes of the blobs
 % read image file
 I = imread('boat.tif');
 % detect SURF features
@@ -104,6 +103,7 @@ pts = detectSURFFeatures(Ig);
 
 % match feature sets from 2 images
 indexPairs = matchFeatures(feats1, feats2);
+%indexPairs = matchFeatures(feats1, feats2, 'MatchThreshold', 10.0, 'MaxRatio', 0.3); %Find optimal configuration
 
 
 % visualise matched features
@@ -112,7 +112,10 @@ matchedPoints2 = validPts2(indexPairs(:, 2));
 figure('name', 'Graffiti - Match features'); showMatchedFeatures(I1,I2,matchedPoints1,matchedPoints2,'montage')
 
 
-%%1.4 Image matching
+
+
+
+%% 1.4 Image matching
 database_images{length(database_dir)} = [];
 database_features{length(database_dir), 2} = [];
 
@@ -248,10 +251,11 @@ end
 
 %% 2.2 Segmentation
 close all; clc;
-%issue_img = [15, 55, 57, 47, 40, 33, 59]
+issue_img = [15, 55, 57, 47, 40, 33, 59]
 fprintf("\nCurrent index:");
-for index = 1:length(collection(:, 1))
-    
+for index = issue_img
+%for index = 1:length(collection(:, 1))
+
     if mod(index - 1, 10) == 0
         fprintf("\n");
     end
@@ -260,12 +264,13 @@ for index = 1:length(collection(:, 1))
 
     
     figure('name', title_string);
-    subplot(1, 2, 1); imshow(collection{index, 1})
+    subplot(1, 2, 1); imshow(collection{index, 1})%Display original image
 
     img = im2double(rgb2gray(collection{index, 1}));
-    filter_mask = get_filter_mask(img);
+    filter_mask = get_filter_mask(img);%Apply image segmentation, returns binary filter mask.
     
-    subplot(1, 2, 2); imshow(filter_mask)
+    
+    subplot(1, 2, 2); imshow(filter_mask)%Display result
 end
 
 %% 2.3 Object identification and statistisc collection
